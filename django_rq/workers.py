@@ -1,7 +1,9 @@
-from rq import Worker
-from rq.utils import import_attribute
+from typing import Optional
 
 from django.conf import settings
+from rq import Worker
+from rq.utils import import_attribute
+from rq.worker_pool import WorkerPool
 
 from .jobs import get_job_class
 from .queues import get_queues
@@ -35,6 +37,16 @@ def get_worker_class(worker_class=None):
     if isinstance(worker_class, str):
         worker_class = import_attribute(worker_class)
     return worker_class
+
+def get_worker_pool_class(worker_pool_class : Optional[str] = None):
+    """
+    Defaults to the built-in worker_pool if None is provided, but allows for
+    an override via a string that is dynamically imported.
+    """
+    if worker_pool_class is None:
+        return WorkerPool
+
+    return import_attribute(worker_pool_class)
 
 
 def get_worker(*queue_names, **kwargs):
