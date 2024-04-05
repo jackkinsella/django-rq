@@ -1,16 +1,15 @@
 import os
 import sys
 
+from django.core.management.base import BaseCommand
+from rq.logutils import setup_loghandlers
 from rq.serializers import resolve_serializer
 from rq.worker_pool import WorkerPool
-from rq.logutils import setup_loghandlers
-
-from django.core.management.base import BaseCommand
 
 from ...jobs import get_job_class
-from ...utils import configure_sentry
 from ...queues import get_queues
-from ...workers import get_worker_class
+from ...utils import configure_sentry
+from ...workers import get_worker_class, get_worker_pool_class
 
 
 class Command(BaseCommand):
@@ -30,6 +29,8 @@ class Command(BaseCommand):
                             type=int, default=1, help='Number of workers to spawn')
         parser.add_argument('--worker-class', action='store', dest='worker_class',
                             help='RQ Worker class to use')
+        parser.add_argument('--worker-pool-class', action='store', dest='worker_pool_class',
+                            default=None, help='RQ Worker Pool class to use')
         parser.add_argument('--pid', action='store', dest='pid',
                             default=None, help='PID file to write the worker`s pid into')
         parser.add_argument('--burst', action='store_true', dest='burst',
@@ -87,9 +88,10 @@ class Command(BaseCommand):
         job_class = get_job_class(options['job_class'])
         queues = get_queues(*args, **{'job_class': job_class, 'queue_class': options['queue_class']})
         worker_class = get_worker_class(options.get('worker_class', None))
+        worker_pool_class = get_worker_pool_class(options.get('worker_pool_class'))
         serializer = resolve_serializer(options['serializer'])
 
-        pool = WorkerPool(
+        pool = worker_pool_class(
             queues=queues,
             connection=queues[0].connection,
             num_workers=options['num_workers'],
