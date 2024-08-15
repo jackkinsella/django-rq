@@ -1,12 +1,13 @@
-from typing import Optional
+from typing import Optional, Type, Union
 
 from django.conf import settings
 from rq import Worker
+from rq.job import Job
 from rq.utils import import_attribute
 from rq.worker_pool import WorkerPool
 
 from .jobs import get_job_class
-from .queues import get_queues
+from .queues import DjangoRQ, get_queues
 
 
 def get_exception_handlers():
@@ -49,16 +50,21 @@ def get_worker_pool_class(worker_pool_class : Optional[str] = None):
     return import_attribute(worker_pool_class)
 
 
-def get_worker(*queue_names, **kwargs):
+def get_worker(
+    *queue_names: str,
+    job_class: Optional[Union[str, Type[Job]]] = None,
+    queue_class: Optional[Union[str, Type[DjangoRQ]]] = None,
+    worker_class: Optional[Union[str, Type[Worker]]] = None,
+    **kwargs,
+) -> Worker:
     """
     Returns a RQ worker for all queues or specified ones.
     """
-    job_class = get_job_class(kwargs.pop('job_class', None))
-    queue_class = kwargs.pop('queue_class', None)
-    queues = get_queues(*queue_names, **{'job_class': job_class, 'queue_class': queue_class})
+    job_class = get_job_class(job_class)
+    queues = get_queues(*queue_names, job_class=job_class, queue_class=queue_class)
     # normalize queue_class to what get_queues returns
     queue_class = queues[0].__class__
-    worker_class = get_worker_class(kwargs.pop('worker_class', None))
+    worker_class = get_worker_class(worker_class)
     return worker_class(
         queues,
         connection=queues[0].connection,
